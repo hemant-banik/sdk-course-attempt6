@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# Scratch dir left behind by local mermaid diagram rendering checks
+.mermaid-check/

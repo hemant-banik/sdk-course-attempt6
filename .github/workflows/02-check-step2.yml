@@ -1,0 +1,97 @@
+name: "Step 2 - First Message"
+
+# Disabled by default. Step 1's workflow enables this one once the learner
+# passes Step 1. Actions won't let a *disabled* workflow run automatically
+# via push, but the enable/disable calls flip it into (in)active before the
+# next relevant push arrives.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "exercises/practice_message.py"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+  actions: write
+
+concurrency:
+  group: course-progress
+  cancel-in-progress: false
+
+jobs:
+  check_step2:
+    name: Verify Step 2 exercise
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install anthropic python-dotenv
+
+      - name: Run checker
+        id: run_checker
+        env:
+          ICA_API_KEY: ${{ secrets.ICA_API_KEY }}
+        run: python .github/scripts/check_step2.py
+
+      - name: Find open Step 2 issue
+        if: success()
+        id: find_issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          number=$(gh issue list --repo "${{ github.repository }}" --label "step-2" --state open --json number --jq '.[0].number')
+          echo "issue_number=$number" >> "$GITHUB_OUTPUT"
+
+      - name: Comment success + close issue
+        if: success() && steps.find_issue.outputs.issue_number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ steps.find_issue.outputs.issue_number }}
+        run: |
+          gh issue comment "$ISSUE" --repo "${{ github.repository }}" --body "✅ **Step 2 complete!** Claude replied correctly. Opening Step 3 now..."
+          gh issue close "$ISSUE" --repo "${{ github.repository }}"
+
+      - name: Open Step 3 issue
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          count=$(gh issue list --repo "${{ github.repository }}" --label "step-3" --state all --json number --jq 'length')
+          if [ "$count" -eq 0 ]; then
+            gh label create "step-3" --color "0E8A16" --force 2>/dev/null || true
+            gh label create "course" --color "5319E7" --force 2>/dev/null || true
+            gh issue create \
+              --repo "${{ github.repository }}" \
+              --assignee "${{ github.actor }}" \
+              --title "Step 3: Inspect the full response object" \
+              --label "step-3,course" \
+              --body-file .github/steps/03-inspect-response.md
+          fi
+
+      - name: Disable this workflow, enable Step 3 checker
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow disable "Step 2 - First Message" --repo "${{ github.repository }}" || true
+          gh workflow enable "Step 3 - Inspect Response" --repo "${{ github.repository }}" || true
+
+      - name: Comment failure reason on issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          number=$(gh issue list --repo "${{ github.repository }}" --label "step-2" --state open --json number --jq '.[0].number')
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "${{ github.repository }}" --body "❌ Step 2 check failed. See the [Actions log](../../actions/runs/${{ github.run_id }}) for details, fix your file, and push again."
+          fi

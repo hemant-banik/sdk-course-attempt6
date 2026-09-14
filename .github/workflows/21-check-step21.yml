@@ -1,0 +1,95 @@
+name: "Step 21 - Bedrock and Vertex Clients"
+
+# Disabled by default; enabled by Step 20's workflow. On success it opens
+# Step 22 (the capstone) and enables that checker, exactly mirroring the
+# hand-off every earlier step workflow performs. Step 22 is now the LAST
+# step, so it — not this file — posts the course-complete issue.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "exercises/practice21_bedrock_vertex.py"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+  actions: write
+
+concurrency:
+  group: course-progress
+  cancel-in-progress: false
+
+jobs:
+  check_step21:
+    name: Verify Step 21 exercise
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install anthropic python-dotenv
+
+      - name: Run checker
+        id: run_checker
+        run: python .github/scripts/check_step21.py
+
+      - name: Find open Step 21 issue
+        if: success()
+        id: find_issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          number=$(gh issue list --repo "${{ github.repository }}" --label "step-21" --state open --json number --jq '.[0].number')
+          echo "issue_number=$number" >> "$GITHUB_OUTPUT"
+
+      - name: Comment success + close issue
+        if: success() && steps.find_issue.outputs.issue_number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ steps.find_issue.outputs.issue_number }}
+        run: |
+          gh issue comment "$ISSUE" --repo "${{ github.repository }}" --body "✅ **Step 21 complete!** You know how to point the SDK at Bedrock and Vertex. Opening Step 22 — the capstone — now..."
+          gh issue close "$ISSUE" --repo "${{ github.repository }}"
+
+      - name: Open Step 22 issue
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          count=$(gh issue list --repo "${{ github.repository }}" --label "step-22" --state all --json number --jq 'length')
+          if [ "$count" -eq 0 ]; then
+            gh label create "step-22" --color "0E8A16" --force 2>/dev/null || true
+            gh label create "course" --color "5319E7" --force 2>/dev/null || true
+            gh issue create \
+              --repo "${{ github.repository }}" \
+              --assignee "${{ github.actor }}" \
+              --title "Step 22: Capstone — build a tool-using assistant" \
+              --label "step-22,course" \
+              --body-file .github/steps/22-capstone.md
+          fi
+
+      - name: Disable this workflow, enable Step 22 checker
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow disable "Step 21 - Bedrock and Vertex Clients" --repo "${{ github.repository }}" || true
+          gh workflow enable "Step 22 - Capstone Assistant" --repo "${{ github.repository }}" || true
+
+      - name: Comment failure reason on issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          number=$(gh issue list --repo "${{ github.repository }}" --label "step-21" --state open --json number --jq '.[0].number')
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "${{ github.repository }}" --body "❌ Step 21 check failed. See the [Actions log](../../actions/runs/${{ github.run_id }}) for details, fix your file, and push again."
+          fi

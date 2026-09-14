@@ -1,0 +1,16 @@
+# Course dependencies. Versions are pinned so every learner gets the exact
+# same behaviour the course text and graders were written against.
+#
+# Install with:  python3 -m pip install -r requirements.txt
+
+# The Anthropic Python SDK. Pinned to the last 0.x release: the course text
+# targets the pre-1.0 API surface, and 1.x has breaking changes.
+anthropic==0.125.0
+
+# Reads ICA_API_KEY out of your .env file. 1.1.1 is the newest release that
+# still supports Python 3.9 (the course floor); 1.2.x requires 3.10+.
+python-dotenv==1.1.1
+
+# Course-only dependency: used in Step 11 to generate a small test PDF so you
+# have something to send to the API. Not part of the Anthropic SDK.
+reportlab==5.0.1

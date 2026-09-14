@@ -1,0 +1,59 @@
+name: "Step 0 - Start Course"
+
+# Fires once, right after a learner creates their repo from this template.
+# It posts the welcome issue + Step 1 issue, then disables itself and
+# enables the Step 1 checker workflow.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  issues: write
+  actions: write
+
+concurrency:
+  group: course-progress
+  cancel-in-progress: false
+
+jobs:
+  start_course:
+    name: Post welcome + Step 1 issue
+    runs-on: ubuntu-latest
+    # Only run this bootstrap once: skip if a "step-1" labeled issue already exists.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check if course already started
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          count=$(gh issue list --repo "${{ github.repository }}" --label "step-1" --state all --json number --jq 'length')
+          echo "already_started=$([ "$count" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Create Step 1 issue
+        if: steps.check.outputs.already_started == 'false'
+        id: create_issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          body=$(cat .github/steps/00-welcome.md; echo; echo "---"; cat .github/steps/01-install-sdk.md)
+          gh label create "step-1" --color "0E8A16" --force 2>/dev/null || true
+          gh label create "course" --color "5319E7" --force 2>/dev/null || true
+          issue_url=$(gh issue create \
+            --repo "${{ github.repository }}" \
+            --assignee "${{ github.actor }}" \
+            --title "Step 1: Install the SDK & create a client" \
+            --label "step-1,course" \
+            --body "$body")
+          echo "Created $issue_url"
+
+      - name: Disable this workflow
+        if: steps.check.outputs.already_started == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow disable "Step 0 - Start Course" --repo "${{ github.repository }}" || true

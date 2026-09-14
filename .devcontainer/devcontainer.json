@@ -1,0 +1,45 @@
+{
+  "name": "Anthropic Python SDK Course",
+
+  "//": "Comments here use JSON-safe \"//\" keys (not // line comments) so this file parses with any strict JSON reader, including python3 -c 'import json; json.load(...)'.",
+
+  "// image": "Python 3.11 on Debian bookworm. The course needs 3.9+; 3.11 is a safe, fast, well-supported floor.",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11-bookworm",
+
+  "// postCreateCommand": "Runs ONCE when the container is first built: install the SDK + python-dotenv, then create .env from .env.example only if .env does not already exist (never clobber a key the learner already pasted in).",
+  "postCreateCommand": "python3 -m pip install --upgrade pip && python3 -m pip install -r requirements.txt && { [ -f .env ] || cp .env.example .env; } && echo 'postCreate: dependencies installed, .env ready.'",
+
+  "// postAttachCommand": "Runs EVERY time you attach a terminal/editor to the Codespace. Prints the welcome banner so the .env reminder is impossible to miss, even on a restart.",
+  "postAttachCommand": "bash .devcontainer/welcome.sh",
+
+  "// SECRETS WARNING": "Repository *Actions* secrets are NOT visible in a Codespaces terminal. Actions secrets and Codespaces secrets are two completely separate stores. Adding ICA_API_KEY under Settings -> Secrets and variables -> Actions only feeds the grader workflow; your Codespace terminal will still see nothing. To run code in here you must EITHER add a *Codespaces* secret named ICA_API_KEY (Settings -> Secrets and variables -> Codespaces, then rebuild the container so it gets injected) OR paste your key into the .env file that postCreateCommand generated for you.",
+
+  "// secretsMetadata": "Declaring the secret here makes GitHub prompt for it on the 'Create codespace' screen and show it under the Codespace's secret settings. It does NOT import Actions secrets.",
+  "secrets": {
+    "ICA_API_KEY": {
+      "description": "Your IBM Consulting Advantage gateway key for api.servicesessentials.ibm.com. Set it as a Codespaces secret, or leave blank and paste it into .env instead.",
+      "documentationUrl": "https://docs.github.com/en/codespaces/managing-your-codespaces/managing-your-account-specific-secrets-for-github-codespaces"
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "// extensions": "ms-python.python is the one that matters (interpreter, Run button, squiggles); the others make the course's .md lessons and .env file nicer to read.",
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "mikestead.dotenv",
+        "bierner.markdown-mermaid"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.terminal.activateEnvironment": false,
+        "files.insertFinalNewline": true,
+        "editor.rulers": [88]
+      }
+    }
+  },
+
+  "// remoteUser": "The base image's non-root user. pip installs land in its home, so no sudo needed.",
+  "remoteUser": "vscode"
+}
